@@ -1,3 +1,4 @@
+// https://github.com/browserify/commonjs-assert/blob/master/assert.js
 // Currently in sync with Node.js lib/assert.js
 // https://github.com/nodejs/node/commit/2a51ae424a513ec9a6aa3466baa0cc1d55dd4f3b
 
@@ -23,57 +24,25 @@
 
 'use strict';
 
-const { codes: {
+import { codes } from '@gjsify/node-internal';
+import type TAssert from 'assert';
+import type { AssertPredicate } from 'assert';
+
+const {
   ERR_AMBIGUOUS_ARGUMENT,
   ERR_INVALID_ARG_TYPE,
   ERR_INVALID_ARG_VALUE,
   ERR_INVALID_RETURN_VALUE,
   ERR_MISSING_ARGS
-} } = require('./internal/errors');
-const AssertionError = require('./internal/assert/assertion_error');
-const { inspect } = require('util/');
-const { isPromise, isRegExp } = require('util/').types;
+} = codes;
 
-const objectAssign = Object.assign ? Object.assign : require('es6-object-assign').assign;
-const objectIs = Object.is ? Object.is : require('object-is');
+import { inspect, types } from 'util';
+import { isDeepEqual, isDeepStrictEqual } from '@gjsify/node-internal/lib/util/comparisons.js';
+import { AssertionError } from '@gjsify/node-internal/lib/assertion_error.js';
 
-const errorCache = new Map();
-
-let isDeepEqual;
-let isDeepStrictEqual;
-let parseExpressionAt;
-let findNodeAround;
-let decoder;
-
-function lazyLoadComparison() {
-  const comparison = require('./internal/util/comparisons');
-  isDeepEqual = comparison.isDeepEqual;
-  isDeepStrictEqual = comparison.isDeepStrictEqual;
-}
-
-// Escape control characters but not \n and \t to keep the line breaks and
-// indentation intact.
-// eslint-disable-next-line no-control-regex
-const escapeSequencesRegExp = /[\x00-\x08\x0b\x0c\x0e-\x1f]/g;
-const meta = [
-  '\\u0000', '\\u0001', '\\u0002', '\\u0003', '\\u0004',
-  '\\u0005', '\\u0006', '\\u0007', '\\b', '',
-  '', '\\u000b', '\\f', '', '\\u000e',
-  '\\u000f', '\\u0010', '\\u0011', '\\u0012', '\\u0013',
-  '\\u0014', '\\u0015', '\\u0016', '\\u0017', '\\u0018',
-  '\\u0019', '\\u001a', '\\u001b', '\\u001c', '\\u001d',
-  '\\u001e', '\\u001f'
-];
-
-const escapeFn = (str) => meta[str.charCodeAt(0)];
+const { isPromise, isRegExp } = types;
 
 let warned = false;
-
-// The assert module provides functions that throw
-// AssertionError's when particular conditions are not met. The
-// assert module must conform to the following interface.
-
-const assert = module.exports = ok;
 
 const NO_EXCEPTION_SENTINEL = {};
 
@@ -89,14 +58,29 @@ function innerFail(obj) {
   throw new AssertionError(obj);
 }
 
-function fail(actual, expected, message, operator, stackStartFn) {
+/**
+ * @since v0.1.21
+ * @param [message='Failed']
+ */
+function fail(message?: string | Error): never;
+  /** @deprecated since v10.0.0 - use fail([message]) or other assert functions instead. */
+function fail(
+  actual: unknown,
+  expected: unknown,
+  message?: string | Error,
+  operator?: string,
+  // tslint:disable-next-line:ban-types
+  stackStartFn?: Function
+): never;
+
+function fail(actual?: unknown, expected?: unknown, message?: string | Error, operator?: string, stackStartFn?: Function) {
   const argsLen = arguments.length;
 
   let internalMessage;
   if (argsLen === 0) {
     internalMessage = 'Failed';
   } else if (argsLen === 1) {
-    message = actual;
+    message = actual as string | Error;
     actual = undefined;
   } else {
     if (warned === false) {
@@ -115,11 +99,11 @@ function fail(actual, expected, message, operator, stackStartFn) {
 
   if (message instanceof Error) throw message;
 
-  const errArgs = {
+  const errArgs: { actual: unknown, expected: unknown, operator: string, stackStartFn: Function, message?: string } = {
     actual,
     expected,
     operator: operator === undefined ? 'fail' : operator,
-    stackStartFn: stackStartFn || fail
+    stackStartFn: stackStartFn || fail,
   };
   if (message !== undefined) {
     errArgs.message = message;
@@ -132,12 +116,7 @@ function fail(actual, expected, message, operator, stackStartFn) {
   throw err;
 }
 
-assert.fail = fail;
-
-// The AssertionError is defined in internal/error.
-assert.AssertionError = AssertionError;
-
-function innerOk(fn, argLen, value, message) {
+function innerOk(fn: Function, argLen: number, value: any, message: string | Error) {
   if (!value) {
     let generatedMessage = false;
 
@@ -162,14 +141,33 @@ function innerOk(fn, argLen, value, message) {
 
 // Pure assertion tests whether a value is truthy, as determined
 // by !!value.
-function ok(...args) {
-  innerOk(ok, args.length, ...args);
+
+/**
+ * @since v0.1.21
+ */
+function ok(value: unknown, message?: string | Error): asserts value;
+function ok(...args: any[]) {
+  innerOk(ok, args.length, args[0], args[1]);
 }
+
+// The assert module provides functions that throw
+// AssertionError's when particular conditions are not met. The
+// assert module must conform to the following interface.
+
+const assert = ok as Partial<typeof TAssert>;
+
+assert.fail = fail;
+
+// The AssertionError is defined in internal/error.
+assert.AssertionError = AssertionError;
+
 assert.ok = ok;
 
-// The equality assertion tests shallow, coercive equality with ==.
-/* eslint-disable no-restricted-properties */
-assert.equal = function equal(actual, expected, message) {
+/**
+ * The equality assertion tests shallow, coercive equality with ==.
+ * @since v0.1.21
+ */
+assert.equal = function equal(actual: unknown, expected: unknown, message?: string | Error) {
   if (arguments.length < 2) {
     throw new ERR_MISSING_ARGS('actual', 'expected');
   }
@@ -185,9 +183,11 @@ assert.equal = function equal(actual, expected, message) {
   }
 };
 
-// The non-equality assertion tests for whether two objects are not
-// equal with !=.
-assert.notEqual = function notEqual(actual, expected, message) {
+/**
+ * The non-equality assertion tests for whether two objects are not equal with !=.
+ * @since v0.1.21
+ */
+assert.notEqual = function notEqual(actual: unknown, expected: unknown, message?: string | Error) {
   if (arguments.length < 2) {
     throw new ERR_MISSING_ARGS('actual', 'expected');
   }
@@ -203,12 +203,14 @@ assert.notEqual = function notEqual(actual, expected, message) {
   }
 };
 
-// The equivalence assertion tests a deep equality relation.
-assert.deepEqual = function deepEqual(actual, expected, message) {
+/**
+ * The equivalence assertion tests a deep equality relation.
+ * @since v0.1.21
+ */
+assert.deepEqual = function deepEqual(actual: unknown, expected: unknown, message?: string | Error) {
   if (arguments.length < 2) {
     throw new ERR_MISSING_ARGS('actual', 'expected');
   }
-  if (isDeepEqual === undefined) lazyLoadComparison();
   if (!isDeepEqual(actual, expected)) {
     innerFail({
       actual,
@@ -220,12 +222,14 @@ assert.deepEqual = function deepEqual(actual, expected, message) {
   }
 };
 
-// The non-equivalence assertion tests for any deep inequality.
-assert.notDeepEqual = function notDeepEqual(actual, expected, message) {
+/**
+ * The non-equivalence assertion tests for any deep inequality.
+ * @since v0.1.21
+ */
+assert.notDeepEqual = function notDeepEqual(actual: unknown, expected: unknown, message?: string | Error) {
   if (arguments.length < 2) {
     throw new ERR_MISSING_ARGS('actual', 'expected');
   }
-  if (isDeepEqual === undefined) lazyLoadComparison();
   if (isDeepEqual(actual, expected)) {
     innerFail({
       actual,
@@ -236,13 +240,17 @@ assert.notDeepEqual = function notDeepEqual(actual, expected, message) {
     });
   }
 };
-/* eslint-enable */
 
-assert.deepStrictEqual = function deepStrictEqual(actual, expected, message) {
+/**
+ * Tests for deep equality between the `actual` and `expected` parameters.
+ * "Deep" equality means that the enumerable "own" properties of child objects
+ * are recursively evaluated also by the following rules.
+ * @since v1.2.0
+ */
+assert.deepStrictEqual = function deepStrictEqual<T>(actual: unknown, expected: T, message?: string | Error): asserts actual is T {
   if (arguments.length < 2) {
     throw new ERR_MISSING_ARGS('actual', 'expected');
   }
-  if (isDeepEqual === undefined) lazyLoadComparison();
   if (!isDeepStrictEqual(actual, expected)) {
     innerFail({
       actual,
@@ -254,12 +262,14 @@ assert.deepStrictEqual = function deepStrictEqual(actual, expected, message) {
   }
 };
 
-assert.notDeepStrictEqual = notDeepStrictEqual;
-function notDeepStrictEqual(actual, expected, message) {
+/**
+ * Tests for deep strict inequality. Opposite of {@link deepStrictEqual}.
+ * @since v1.2.0
+ */
+function notDeepStrictEqual(actual: unknown, expected: unknown, message?: string | Error) {
   if (arguments.length < 2) {
     throw new ERR_MISSING_ARGS('actual', 'expected');
   }
-  if (isDeepEqual === undefined) lazyLoadComparison();
   if (isDeepStrictEqual(actual, expected)) {
     innerFail({
       actual,
@@ -270,12 +280,18 @@ function notDeepStrictEqual(actual, expected, message) {
     });
   }
 }
+assert.notDeepStrictEqual = notDeepStrictEqual;
 
-assert.strictEqual = function strictEqual(actual, expected, message) {
+/**
+ * Tests strict equality between the `actual` and `expected` parameters as
+ * determined by [`Object.is()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/is).
+ * @since v0.1.21
+ */
+assert.strictEqual = function strictEqual<T>(actual: unknown, expected: T, message?: string | Error): asserts actual is T {
   if (arguments.length < 2) {
     throw new ERR_MISSING_ARGS('actual', 'expected');
   }
-  if (!objectIs(actual, expected)) {
+  if (!Object.is(actual, expected)) {
     innerFail({
       actual,
       expected,
@@ -286,11 +302,16 @@ assert.strictEqual = function strictEqual(actual, expected, message) {
   }
 };
 
-assert.notStrictEqual = function notStrictEqual(actual, expected, message) {
+/**
+ * Tests strict inequality between the `actual` and `expected` parameters as
+ * determined by [`Object.is()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/is).
+ * @since v0.1.21
+ */
+assert.notStrictEqual = function notStrictEqual(actual: unknown, expected: unknown, message?: string | Error) {
   if (arguments.length < 2) {
     throw new ERR_MISSING_ARGS('actual', 'expected');
   }
-  if (objectIs(actual, expected)) {
+  if (Object.is(actual, expected)) {
     innerFail({
       actual,
       expected,
@@ -302,7 +323,7 @@ assert.notStrictEqual = function notStrictEqual(actual, expected, message) {
 };
 
 class Comparison {
-  constructor(obj, keys, actual) {
+  constructor(obj, keys, actual?) {
     keys.forEach(key => {
       if (key in obj) {
         if (actual !== undefined &&
@@ -347,7 +368,7 @@ function compareExceptionKey(actual, expected, key, message, keys, fn) {
   }
 }
 
-function expectedException(actual, expected, msg, fn) {
+function expectedException(actual, expected, msg?, fn?) {
   if (typeof expected !== 'function') {
     if (isRegExp(expected))
       return expected.test(actual);
@@ -380,7 +401,6 @@ function expectedException(actual, expected, msg, fn) {
       throw new ERR_INVALID_ARG_VALUE('error',
                                       expected, 'may not be an empty object');
     }
-    if (isDeepEqual === undefined) lazyLoadComparison();
     keys.forEach(key => {
       if (
         typeof actual[key] === 'string' &&
@@ -528,27 +548,70 @@ function expectsNoError(stackStartFn, actual, error, message) {
   throw actual;
 }
 
-assert.throws = function throws(promiseFn, ...args) {
-  expectsError(throws, getActual(promiseFn), ...args);
+/**
+ * Expects the function `fn` to throw an error.
+ * @since v0.1.21
+ */
+function throws(block: () => unknown, message?: string | Error): void;
+function throws(block: () => unknown, error: AssertPredicate, message?: string | Error): void;
+function throws(promiseFn: () => unknown, ...args: any[]) {
+  expectsError(throws, getActual(promiseFn), args[0], args[1]);
 };
+assert.throws = throws;
 
-assert.rejects = function rejects(promiseFn, ...args) {
+/**
+ * Awaits the `asyncFn` promise or, if `asyncFn` is a function, immediately
+ * calls the function and awaits the returned promise to complete. It will then
+ * check that the promise is rejected.
+ *
+ * @since v10.0.0
+ */
+async function rejects(block: (() => Promise<unknown>) | Promise<unknown>, message?: string | Error): Promise<void>;
+async function rejects(block: (() => Promise<unknown>) | Promise<unknown>, error: AssertPredicate, message?: string | Error): Promise<void>;
+async function rejects(promiseFn: (() => Promise<unknown>) | Promise<unknown>, ...args: any[]) {
   return waitForActual(promiseFn).then(result => {
-    return expectsError(rejects, result, ...args);
+    return expectsError(rejects, result, args[0], args[1]);
   });
-};
+}
+assert.rejects = rejects;
 
-assert.doesNotThrow = function doesNotThrow(fn, ...args) {
-  expectsNoError(doesNotThrow, getActual(fn), ...args);
-};
+/**
+ * Asserts that the function `fn` does not throw an error.
+ *
+ * @since v0.1.21
+ */
+function doesNotThrow(block: () => unknown, message?: string | Error): void;
+function doesNotThrow(block: () => unknown, error: AssertPredicate, message?: string | Error): void;
+function doesNotThrow(fn: () => unknown, ...args: any[]) {
+  expectsNoError(doesNotThrow, getActual(fn), args[0], args[1]);
+}
+assert.doesNotThrow = doesNotThrow;
 
-assert.doesNotReject = function doesNotReject(fn, ...args) {
+/**
+ * Awaits the `asyncFn` promise or, if `asyncFn` is a function, immediately
+ * calls the function and awaits the returned promise to complete. It will then
+ * check that the promise is not rejected.
+ *
+ * @since v10.0.0
+ */
+async function doesNotReject(block: (() => Promise<unknown>) | Promise<unknown>, message?: string | Error): Promise<void>;
+async function doesNotReject(block: (() => Promise<unknown>) | Promise<unknown>, error: AssertPredicate, message?: string | Error): Promise<void>;
+async function doesNotReject(fn: (() => Promise<unknown>) | Promise<unknown>, ...args: any[]) {
   return waitForActual(fn).then(result => {
-    return expectsNoError(doesNotReject, result, ...args);
+    return expectsNoError(doesNotReject, result, args[0], args[1]);
   });
-};
+}
+assert.doesNotReject = doesNotReject;
 
-assert.ifError = function ifError(err) {
+/**
+ * Throws `value` if `value` is not `undefined` or `null`. This is useful when
+ * testing the `error` argument in callbacks. The stack trace contains all frames
+ * from the error passed to `ifError()` including the potential new frames for`ifError()` itself.
+ *
+ * @since v0.1.97
+ */
+function ifError(value: unknown): asserts value is null | undefined;
+function ifError(err: Error): asserts err is null | undefined {
   if (err !== null && err !== undefined) {
     let message = 'ifError got unwanted exception: ';
     if (typeof err === 'object' && typeof err.message === 'string') {
@@ -594,16 +657,20 @@ assert.ifError = function ifError(err) {
 
     throw newErr;
   }
-};
+}
+assert.ifError = ifError;
 
 // Expose a strict only variant of assert
-function strict(...args) {
-  innerOk(strict, args.length, ...args);
+function strict(...args: any[]) {
+  innerOk(strict, args.length, args[0], args[1]);
 }
-assert.strict = objectAssign(strict, assert, {
+
+(assert as any).strict = Object.assign(strict, assert, {
   equal: assert.strictEqual,
   deepEqual: assert.deepStrictEqual,
   notEqual: assert.notStrictEqual,
   notDeepEqual: assert.notDeepStrictEqual
 });
 assert.strict.strict = assert.strict;
+
+export default (assert as typeof TAssert);

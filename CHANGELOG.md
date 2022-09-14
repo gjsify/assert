@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## 0.0.1 (Gjsify)
+* Replaced internal methods with `@gjsify/node-internal`
+* Transformed to TypeScript
+
 ## 2.0.0
 
 * Sync with Node.js master. ([@lukechilds](https://github.com/lukechilds) in [#44](https://github.com/browserify/commonjs-assert/pull/44))

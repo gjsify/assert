@@ -1,3 +1,9 @@
+# @gjsify/assert
+
+The assert module from Node.js, for Gjs
+
+# Original Readme
+
 # assert
 
 > The [`assert`](https://nodejs.org/api/assert.html) module from Node.js, for the browser.
