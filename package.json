@@ -19,7 +19,9 @@
     "build:test:node": "gjsify build src/test.mts --app node --outfile test.node.mjs",
     "test": "yarn run print:name && yarn run build && yarn run build:test && yarn run test:node && yarn run test:gjs",
     "test:gjs": "gjs -m test.gjs.mjs",
-    "test:node": "node test.node.mjs"
+    "test:node": "node test.node.mjs",
+    "git:upstream:init": "git remote add upstream https://github.com/browserify/commonjs-assert.git || exit 0",
+    "git:upstream:merge": "yarn git:upstream:init && git fetch upstream && git merge upstream/master"
   },
   "keywords": [
     "assert",
