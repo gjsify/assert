@@ -41,6 +41,8 @@ import { isDeepEqual, isDeepStrictEqual } from '@gjsify/node-internal/lib/util/c
 import { AssertionError } from '@gjsify/node-internal/lib/assertion_error.js';
 
 const { isPromise, isRegExp } = types;
+import callBoundIntrinsic from 'call-bind/callBound';
+const RegExpPrototypeTest = callBoundIntrinsic('RegExp.prototype.test');
 
 let warned = false;
 
@@ -52,7 +54,7 @@ const NO_EXCEPTION_SENTINEL = {};
 // both the actual and expected values to the assertion error for
 // display purposes.
 
-function innerFail(obj) {
+function innerFail(obj: any) {
   if (obj.message instanceof Error) throw obj.message;
 
   throw new AssertionError(obj);
@@ -62,9 +64,9 @@ function innerFail(obj) {
  * @since v0.1.21
  * @param [message='Failed']
  */
-function fail(message?: string | Error): never;
+export function fail(message?: string | Error): never;
   /** @deprecated since v10.0.0 - use fail([message]) or other assert functions instead. */
-function fail(
+export function fail(
   actual: unknown,
   expected: unknown,
   message?: string | Error,
@@ -73,7 +75,7 @@ function fail(
   stackStartFn?: Function
 ): never;
 
-function fail(actual?: unknown, expected?: unknown, message?: string | Error, operator?: string, stackStartFn?: Function) {
+export function fail(actual?: unknown, expected?: unknown, message?: string | Error, operator?: string, stackStartFn?: Function) {
   const argsLen = arguments.length;
 
   let internalMessage;
@@ -145,8 +147,8 @@ function innerOk(fn: Function, argLen: number, value: any, message: string | Err
 /**
  * @since v0.1.21
  */
-function ok(value: unknown, message?: string | Error): asserts value;
-function ok(...args: any[]) {
+export function ok(value: unknown, message?: string | Error): asserts value;
+export function ok(...args: any[]) {
   innerOk(ok, args.length, args[0], args[1]);
 }
 
@@ -167,7 +169,7 @@ assert.ok = ok;
  * The equality assertion tests shallow, coercive equality with ==.
  * @since v0.1.21
  */
-assert.equal = function equal(actual: unknown, expected: unknown, message?: string | Error) {
+assert.equal  = function equal(actual: unknown, expected: unknown, message?: string | Error) {
   if (arguments.length < 2) {
     throw new ERR_MISSING_ARGS('actual', 'expected');
   }
@@ -182,6 +184,7 @@ assert.equal = function equal(actual: unknown, expected: unknown, message?: stri
     });
   }
 };
+export const equal = assert.equal;
 
 /**
  * The non-equality assertion tests for whether two objects are not equal with !=.
@@ -202,6 +205,7 @@ assert.notEqual = function notEqual(actual: unknown, expected: unknown, message?
     });
   }
 };
+export const notEqual = assert.notEqual;
 
 /**
  * The equivalence assertion tests a deep equality relation.
@@ -222,6 +226,8 @@ assert.deepEqual = function deepEqual(actual: unknown, expected: unknown, messag
   }
 };
 
+export const deepEqual = assert.deepEqual ;
+
 /**
  * The non-equivalence assertion tests for any deep inequality.
  * @since v0.1.21
@@ -240,6 +246,7 @@ assert.notDeepEqual = function notDeepEqual(actual: unknown, expected: unknown, 
     });
   }
 };
+export const notDeepEqual = assert.notDeepEqual;
 
 /**
  * Tests for deep equality between the `actual` and `expected` parameters.
@@ -261,12 +268,13 @@ assert.deepStrictEqual = function deepStrictEqual<T>(actual: unknown, expected: 
     });
   }
 };
+export const deepStrictEqual = assert.deepStrictEqual;
 
 /**
  * Tests for deep strict inequality. Opposite of {@link deepStrictEqual}.
  * @since v1.2.0
  */
-function notDeepStrictEqual(actual: unknown, expected: unknown, message?: string | Error) {
+assert.notDeepStrictEqual = function notDeepStrictEqual(actual: unknown, expected: unknown, message?: string | Error) {
   if (arguments.length < 2) {
     throw new ERR_MISSING_ARGS('actual', 'expected');
   }
@@ -280,7 +288,7 @@ function notDeepStrictEqual(actual: unknown, expected: unknown, message?: string
     });
   }
 }
-assert.notDeepStrictEqual = notDeepStrictEqual;
+export const notDeepStrictEqual = assert.notDeepStrictEqual;
 
 /**
  * Tests strict equality between the `actual` and `expected` parameters as
@@ -301,6 +309,7 @@ assert.strictEqual = function strictEqual<T>(actual: unknown, expected: T, messa
     });
   }
 };
+export const strictEqual = assert.strictEqual;
 
 /**
  * Tests strict inequality between the `actual` and `expected` parameters as
@@ -321,6 +330,7 @@ assert.notStrictEqual = function notStrictEqual(actual: unknown, expected: unkno
     });
   }
 };
+export const notStrictEqual = assert.notStrictEqual;
 
 class Comparison {
   constructor(obj, keys, actual?) {
@@ -329,7 +339,7 @@ class Comparison {
         if (actual !== undefined &&
           typeof actual[key] === 'string' &&
           isRegExp(obj[key]) &&
-          obj[key].test(actual[key])
+          RegExpPrototypeTest(obj[key], actual[key])
         ) {
           this[key] = actual[key];
         } else {
@@ -371,7 +381,7 @@ function compareExceptionKey(actual, expected, key, message, keys, fn) {
 function expectedException(actual, expected, msg?, fn?) {
   if (typeof expected !== 'function') {
     if (isRegExp(expected))
-      return expected.test(actual);
+      return RegExpPrototypeTest(expected, actual);
     // assert.doesNotThrow does not accept objects.
     if (arguments.length === 2) {
       throw new ERR_INVALID_ARG_TYPE(
@@ -405,7 +415,7 @@ function expectedException(actual, expected, msg?, fn?) {
       if (
         typeof actual[key] === 'string' &&
         isRegExp(expected[key]) &&
-        expected[key].test(actual[key])
+        RegExpPrototypeTest(expected[key], actual[key])
       ) {
         return;
       }
@@ -552,9 +562,9 @@ function expectsNoError(stackStartFn, actual, error, message) {
  * Expects the function `fn` to throw an error.
  * @since v0.1.21
  */
-function throws(block: () => unknown, message?: string | Error): void;
-function throws(block: () => unknown, error: AssertPredicate, message?: string | Error): void;
-function throws(promiseFn: () => unknown, ...args: any[]) {
+export function throws(block: () => unknown, message?: string | Error): void;
+export function throws(block: () => unknown, error: AssertPredicate, message?: string | Error): void;
+export function throws(promiseFn: () => unknown, ...args: any[]) {
   expectsError(throws, getActual(promiseFn), args[0], args[1]);
 };
 assert.throws = throws;
@@ -566,9 +576,9 @@ assert.throws = throws;
  *
  * @since v10.0.0
  */
-async function rejects(block: (() => Promise<unknown>) | Promise<unknown>, message?: string | Error): Promise<void>;
-async function rejects(block: (() => Promise<unknown>) | Promise<unknown>, error: AssertPredicate, message?: string | Error): Promise<void>;
-async function rejects(promiseFn: (() => Promise<unknown>) | Promise<unknown>, ...args: any[]) {
+export async function rejects(block: (() => Promise<unknown>) | Promise<unknown>, message?: string | Error): Promise<void>;
+export async function rejects(block: (() => Promise<unknown>) | Promise<unknown>, error: AssertPredicate, message?: string | Error): Promise<void>;
+export async function rejects(promiseFn: (() => Promise<unknown>) | Promise<unknown>, ...args: any[]) {
   return waitForActual(promiseFn).then(result => {
     return expectsError(rejects, result, args[0], args[1]);
   });
@@ -580,9 +590,9 @@ assert.rejects = rejects;
  *
  * @since v0.1.21
  */
-function doesNotThrow(block: () => unknown, message?: string | Error): void;
-function doesNotThrow(block: () => unknown, error: AssertPredicate, message?: string | Error): void;
-function doesNotThrow(fn: () => unknown, ...args: any[]) {
+export function doesNotThrow(block: () => unknown, message?: string | Error): void;
+export function doesNotThrow(block: () => unknown, error: AssertPredicate, message?: string | Error): void;
+export function doesNotThrow(fn: () => unknown, ...args: any[]) {
   expectsNoError(doesNotThrow, getActual(fn), args[0], args[1]);
 }
 assert.doesNotThrow = doesNotThrow;
@@ -594,9 +604,9 @@ assert.doesNotThrow = doesNotThrow;
  *
  * @since v10.0.0
  */
-async function doesNotReject(block: (() => Promise<unknown>) | Promise<unknown>, message?: string | Error): Promise<void>;
-async function doesNotReject(block: (() => Promise<unknown>) | Promise<unknown>, error: AssertPredicate, message?: string | Error): Promise<void>;
-async function doesNotReject(fn: (() => Promise<unknown>) | Promise<unknown>, ...args: any[]) {
+export async function doesNotReject(block: (() => Promise<unknown>) | Promise<unknown>, message?: string | Error): Promise<void>;
+export async function doesNotReject(block: (() => Promise<unknown>) | Promise<unknown>, error: AssertPredicate, message?: string | Error): Promise<void>;
+export async function doesNotReject(fn: (() => Promise<unknown>) | Promise<unknown>, ...args: any[]) {
   return waitForActual(fn).then(result => {
     return expectsNoError(doesNotReject, result, args[0], args[1]);
   });
@@ -610,8 +620,8 @@ assert.doesNotReject = doesNotReject;
  *
  * @since v0.1.97
  */
-function ifError(value: unknown): asserts value is null | undefined;
-function ifError(err: Error): asserts err is null | undefined {
+export function ifError(value: unknown): asserts value is null | undefined;
+export function ifError(err: Error): asserts err is null | undefined {
   if (err !== null && err !== undefined) {
     let message = 'ifError got unwanted exception: ';
     if (typeof err === 'object' && typeof err.message === 'string') {
@@ -659,6 +669,53 @@ function ifError(err: Error): asserts err is null | undefined {
   }
 }
 assert.ifError = ifError;
+
+// Currently in sync with Node.js lib/assert.js
+// https://github.com/nodejs/node/commit/2a871df3dfb8ea663ef5e1f8f62701ec51384ecb
+function internalMatch(string, regexp, message, fn, fnName) {
+  if (!isRegExp(regexp)) {
+    throw new ERR_INVALID_ARG_TYPE(
+      'regexp', 'RegExp', regexp
+    );
+  }
+  const match = fnName === 'match';
+  if (typeof string !== 'string' ||
+      RegExpPrototypeTest(regexp, string) !== match) {
+    if (message instanceof Error) {
+      throw message;
+    }
+
+    const generatedMessage = !message;
+
+    // 'The input was expected to not match the regular expression ' +
+    message = message || (typeof string !== 'string' ?
+      'The "string" argument must be of type string. Received type ' +
+        `${typeof string} (${inspect(string)})` :
+      (match ?
+        'The input did not match the regular expression ' :
+        'The input was expected to not match the regular expression ') +
+          `${inspect(regexp)}. Input:\n\n${inspect(string)}\n`);
+    const err = new AssertionError({
+      actual: string,
+      expected: regexp,
+      message,
+      operator: fnName,
+      stackStartFn: fn
+    });
+    err.generatedMessage = generatedMessage;
+    throw err;
+  }
+}
+
+assert.match = function match(string, regexp, message) {
+  internalMatch(string, regexp, message, match, 'match');
+};
+export const match = assert.match;
+
+assert.doesNotMatch = function doesNotMatch(string, regexp, message) {
+  internalMatch(string, regexp, message, doesNotMatch, 'doesNotMatch');
+};
+export const doesNotMatch = assert.doesNotMatch;
 
 // Expose a strict only variant of assert
 function strict(...args: any[]) {
