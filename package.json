@@ -35,7 +35,7 @@
     "@gjsify/cli": "workspace:^",
     "@gjsify/unit": "workspace:^",
     "@types/call-bind": "^1.0.1",
-    "@types/node": "^18.11.17",
+    "@types/node": "^18.11.18",
     "call-bind": "^1.0.2",
     "util": "^0.12.5"
   }
